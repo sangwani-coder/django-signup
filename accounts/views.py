@@ -4,17 +4,20 @@ from django.contrib.sites.shortcuts import get_current_site
 from django.contrib.auth.models import User
 from django.template.loader import render_to_string
 from django.contrib.auth.tokens import default_token_generator
-
-
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib import messages
+from django.urls import reverse
 from .helpers import basic_auth_encode, basic_auth_decode
 from .forms import SignUpForm
 from .tokens import account_activation_token
 
 def home_view(request):
-    return render(request, 'home.html')
+    context = {}
+    context['user'] = request.user
+    return render(request, 'home.html', context)
 
 def activation_sent_view(request):
-    return render(request, 'activation_sent.html')
+    return render(request, 'registration/activation_sent.html')
 
 
 def activate(request, uidb64, token):
@@ -30,7 +33,7 @@ def activate(request, uidb64, token):
         login(request, user)
         return redirect('home')
     else:
-        return render(request, 'activation_invalid.html')
+        return render(request, 'registration/activation_invalid.html')
 
 
 def signup_view(request):
@@ -48,7 +51,7 @@ def signup_view(request):
             subject = 'Please Activate Your Account'
             uid64 = basic_auth_encode(user.pk)
             token = default_token_generator.make_token(user)
-            message = render_to_string('activation_request.html', {
+            message = render_to_string('registration/activation_request.html', {
                 'user': user,
                 'domain': current_site.domain,
                 'uid': uid64,
@@ -58,5 +61,23 @@ def signup_view(request):
             return redirect('activation_sent')
     else:
         form = SignUpForm()
-    return render(request, 'signup.html', {'form': form})
+    return render(request, 'registration/signup.html', {'form': form})
 
+
+def login_view(request):
+    if request.method == 'POST':
+        form = AuthenticationForm(request.POST)
+        username = request.POST['username']
+        password = request.POST['password']
+        user = authenticate(username=username, password=password)
+        if user:
+            user_object = User.objects.get(username=user)
+            login(request, user_object)
+            messages.success(request, "Logged in")
+            return redirect(reverse('home'))
+        else:
+            form = AuthenticationForm()
+            return render(request, 'registration/login.html', {'form': form})
+    else:
+        form = AuthenticationForm()
+    return render(request, 'registration/login.html', {'form': form})

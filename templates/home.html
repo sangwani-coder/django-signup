@@ -1,1 +1,15 @@
-home
+{% extends 'layout_auth.html' %}
+
+{% block main %}
+{% if user.is_authenticated %}
+<p>Auth user {{user}} </p>
+<form id="logout-form" method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-link">Logout</button>
+</form>
+{% else %}
+<p>User {{user}}</p>
+<a href="{% url 'login' %}">login</a>
+<a href="{% url 'signup' %}">signup</a>
+{% endif %}
+{% endblock %}
