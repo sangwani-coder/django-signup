@@ -1,15 +1,12 @@
 from django.contrib.auth import login, authenticate
-from django.shortcuts import render, redirect, get_object_or_404, HttpResponseRedirect
+from django.shortcuts import render, redirect
 from django.contrib.sites.shortcuts import get_current_site
-from django.utils.encoding import force_str
 from django.contrib.auth.models import User
-from django.db import IntegrityError
-from django.utils.http import urlsafe_base64_decode
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
-from .tokens import account_activation_token
 from django.template.loader import render_to_string
+from django.contrib.auth.tokens import default_token_generator
 
+
+from .helpers import basic_auth_encode, basic_auth_decode
 from .forms import SignUpForm
 from .tokens import account_activation_token
 
@@ -22,12 +19,11 @@ def activation_sent_view(request):
 
 def activate(request, uidb64, token):
     try:
-        uid = force_str(urlsafe_base64_decode(uidb64))
+        uid = basic_auth_decode(uidb64)
         user = User.objects.get(pk=uid)
     except (TypeError, ValueError, OverflowError, User.DoesNotExist):
         user = None
-
-    if user is not None and account_activation_token.check_token(user, token):
+    if user is not None and default_token_generator.check_token(user, token):
         user.is_active = True
         user.profile.signup_confirmation = True
         user.save()
@@ -35,6 +31,7 @@ def activate(request, uidb64, token):
         return redirect('home')
     else:
         return render(request, 'activation_invalid.html')
+
 
 def signup_view(request):
     if request.method  == 'POST':
@@ -49,13 +46,13 @@ def signup_view(request):
             user.save()
             current_site = get_current_site(request)
             subject = 'Please Activate Your Account'
+            uid64 = basic_auth_encode(user.pk)
+            token = default_token_generator.make_token(user)
             message = render_to_string('activation_request.html', {
                 'user': user,
                 'domain': current_site.domain,
-                'uid':'sampleuid',
-                'token':'sampltoken'
-                # 'uid': urlsafe_base64_encode(force_bytes(user.pk)),
-                # 'token': account_activation_token.make_token(user),
+                'uid': uid64,
+                'token': token,
             })
             user.email_user(subject, message)
             return redirect('activation_sent')
